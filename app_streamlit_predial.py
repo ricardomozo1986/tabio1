@@ -56,3 +56,37 @@ if uploaded_file:
 
     st.markdown("### Tabla de resultados filtrados")
     st.dataframe(dff[['Vereda', 'Sector', 'Destino_Ec', 'VlrImpuest', 'Recaudo', 'AreaTerren', 'AreaConstr', 'Descuentos']])
+
+    # --- Análisis adicionales ---
+    st.markdown("## 🧮 Análisis adicionales")
+
+    # 1. Cumplimiento tributario por vereda
+    st.markdown("### 1. Cumplimiento tributario por vereda")
+    cumplimiento_por_vereda = df.groupby('Vereda')['Cumplimiento'].mean().sort_values(ascending=False) * 100
+    fig_cump = px.bar(cumplimiento_por_vereda, title='Tasa de cumplimiento por vereda (%)', labels={'value': 'Cumplimiento (%)'})
+    st.plotly_chart(fig_cump, use_container_width=True)
+
+    # 2. Segmentación de cartera morosa
+    st.markdown("### 2. Segmentación de cartera morosa")
+    morosos = df[df['Pago'] == 'No']
+    morosos['RangoDeuda'] = pd.cut(morosos['VlrImpuest'], bins=[0, 50000, 100000, 300000, 1000000, df['VlrImpuest'].max()],
+                                    labels=['<50K', '50K-100K', '100K-300K', '300K-1M', '>1M'])
+    st.bar_chart(morosos['RangoDeuda'].value_counts().sort_index())
+
+    # 3. Oportunidades de actualización catastral
+    st.markdown("### 3. Oportunidades de actualización catastral")
+    sin_construccion = df[(df['AreaConstr'] == 0) & (df['VlrImpuest'] > 0)]
+    st.write(f"Predios con avalúo > 0 pero sin área construida registrada: {len(sin_construccion)}")
+    st.dataframe(sin_construccion[['Vereda', 'Sector', 'VlrImpuest', 'AreaTerren', 'AreaConstr']].head(10))
+
+    # 4. Estrategias de cobro
+    st.markdown("### 4. Predios con prioridad para cobro coactivo")
+    prioridad_cobro = df[(df['Pago'] == 'No') & (df['VlrImpuest'] > df['VlrImpuest'].quantile(0.75))]
+    st.write(f"Predios candidatos a gestión de cobro prioritaria: {len(prioridad_cobro)}")
+    st.dataframe(prioridad_cobro[['Vereda', 'VlrImpuest', 'Recaudo', 'Destino_Ec']].head(10))
+
+    # 5. Simulación de escenarios
+    st.markdown("### 5. Simulación de incremento de recaudo")
+    morosos_rurales = df[(df['Pago'] == 'No') & (df['Sector'] == 'RURAL')]
+    simulado_recaudo = morosos_rurales['VlrImpuest'].sum() * 0.10
+    st.write(f"Recaudo potencial si el 10% de los morosos rurales paga: ${simulado_recaudo:,.0f}")
